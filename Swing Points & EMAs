@@ -1,0 +1,171 @@
+//@version=5
+indicator("Comprehensive Indicator: SP, FVG, EMAs, Fractals, and Pivots", shorttitle="CInd", overlay=true, max_labels_count=500)
+
+// Inputs for Swing Points
+inputHighlightIntermediates = input(true, "Highlight Intermediate Swing Highs and Lows")
+inputIntermediateSize = input.string("Normal", "Intermediate Swing Label Size", options=["Auto", "Tiny", "Small", "Normal"])
+inputShowShortTermSwings = input(false, "Show Short Term Swings")
+inputPivotBars = input.int(1, "# Candles on Left/Right To Form A Swing Pivot")
+
+// Determine Label Size
+intermediateLabelSize = inputIntermediateSize == "Auto" ? size.auto : inputIntermediateSize == "Tiny" ? size.tiny : inputIntermediateSize == "Small" ? size.small : size.normal
+
+// Arrays for Swing Highs and Lows
+var float[] swingHighs = array.new_float()
+var label[] swingHighLabels = array.new_label()
+var bool[] swingHighIsHigher = array.new_bool()
+var bool[] swingHighIsIntermediate = array.new_bool()
+
+var float[] swingLows = array.new_float()
+var label[] swingLowLabels = array.new_label()
+var bool[] swingLowIsLower = array.new_bool()
+var bool[] swingLowIsIntermediate = array.new_bool()
+
+// Helper Functions
+array_peek(arrayId) =>
+    int arraySize = array.size(arrayId)
+    arraySize > 0 ? array.get(arrayId, arraySize - 1) : na
+
+remove_short_term_swings() =>
+    if not inputShowShortTermSwings and barstate.islast
+        for i = 0 to (array.size(swingHighLabels) - 1)
+            if not array.get(swingHighIsIntermediate, i)
+                label.delete(array.get(swingHighLabels, i))
+        for i = 0 to (array.size(swingLowLabels) - 1)
+            if not array.get(swingLowIsIntermediate, i)
+                label.delete(array.get(swingLowLabels, i))
+
+// Detect Swing Highs and Lows
+swingHighPrice = ta.pivothigh(high, inputPivotBars, inputPivotBars)
+swingLowPrice = ta.pivotlow(low, inputPivotBars, inputPivotBars)
+
+if not na(swingHighPrice)
+    lastSwingHighPrice = array_peek(swingHighs)
+    isHigherHigh = (swingHighPrice > lastSwingHighPrice)
+    isLowerHigh = (swingHighPrice < lastSwingHighPrice)
+    swingLabel = label.new(bar_index[inputPivotBars], swingHighPrice, color=color.green, yloc=yloc.abovebar, style=label.style_triangledown, size=size.tiny)
+
+    if isLowerHigh and array_peek(swingHighIsHigher)
+        if inputHighlightIntermediates
+            label.set_size(array_peek(swingHighLabels), intermediateLabelSize)
+            array.set(swingHighIsIntermediate, array.size(swingHighIsIntermediate) - 1, true)
+
+    array.push(swingHighs, swingHighPrice)
+    array.push(swingHighLabels, swingLabel)
+    array.push(swingHighIsHigher, isHigherHigh)
+    array.push(swingHighIsIntermediate, false)
+
+if not na(swingLowPrice)
+    lastSwingLowPrice = array_peek(swingLows)
+    isHigherLow = (swingLowPrice > lastSwingLowPrice)
+    isLowerLow = (swingLowPrice < lastSwingLowPrice)
+    swingLabel = label.new(bar_index[inputPivotBars], swingLowPrice, color=color.red, yloc=yloc.belowbar, style=label.style_triangleup, size=size.tiny)
+
+    if isHigherLow and array_peek(swingLowIsLower)
+        if inputHighlightIntermediates
+            label.set_size(array_peek(swingLowLabels), intermediateLabelSize)
+            array.set(swingLowIsIntermediate, array.size(swingLowIsIntermediate) - 1, true)
+
+    array.push(swingLows, swingLowPrice)
+    array.push(swingLowLabels, swingLabel)
+    array.push(swingLowIsLower, isLowerLow)
+    array.push(swingLowIsIntermediate, false)
+
+remove_short_term_swings()
+
+// Inputs for Fair Value Gaps
+fvgColor = input.color(color.new(color.red, 90), title="FVG Color")
+
+// Variables for Fair Value Gaps
+var float fvgHigh = na
+var float fvgLow = na
+var box fvgBox = na
+
+if not na(swingHighPrice) and not na(swingLowPrice)
+    if swingHighPrice[1] < swingLowPrice and swingHighPrice[1] > swingLowPrice[1]
+        fvgHigh := high[1]
+        fvgLow := low[1]
+        fvgBox := box.new(left=bar_index[1], top=fvgHigh, right=bar_index, bottom=fvgLow, border_color=fvgColor, border_width=1)
+        box.set_bgcolor(fvgBox, fvgColor)
+
+if not na(fvgBox)
+    box.set_right(fvgBox, bar_index)
+
+// Inputs for EMAs
+ema20 = ta.ema(close, 20)
+ema50 = ta.ema(close, 50)
+ema100 = ta.ema(close, 100)
+ema200 = ta.ema(close, 200)
+
+// Plot EMAs
+plot(ema20, color=color.red, title="EMA 20")
+plot(ema50, color=color.orange, title="EMA 50")
+plot(ema100, color=color.aqua, title="EMA 100")
+plot(ema200, color=color.blue, title="EMA 200")
+
+// Inputs for Fractals
+var GRP1 = "••••••• FRACTALS •••••••"
+showFractals = input.bool(true, title='Show fractal points?', group=GRP1)
+filterFractal = input.string(title='Filter 3/5 bar fractal', defval='3', options=['3', '5'], group=GRP1)
+
+// Fractals
+isRegularFractal(mode, n) =>
+    mode == 'Buy' ? high[n - 1] < high[n] and high[n + 1] < high[n] : mode == 'Sell' ? low[n - 1] > low[n] and low[n + 1] > low[n] : false
+
+isBWFractal(mode, n) =>
+    mode == 'Buy' ? high[n - 2] < high[n] and high[n - 1] < high[n] and high[n + 1] < high[n] and high[n + 2] < high[n] : mode == 'Sell' ? low[n - 2] > low[n] and low[n - 1] > low[n] and low[n + 1] > low[n] and low[n + 2] > low[n] : false
+    
+isFractalHigh(i) =>
+    filterFractal == '3' ? isRegularFractal('Buy', i) : isBWFractal('Buy', i + 1)
+
+isFractalLow(i) =>
+    filterFractal == '3' ? isRegularFractal('Sell', i) : isBWFractal('Sell', i + 1)
+
+plotshape(showFractals and isFractalHigh(1), title='Fractal High', style=shape.triangledown, location=location.abovebar, color=color.new(color.red, 0), offset=filterFractal == '3' ? -1 : -2, size=size.auto)
+plotshape(showFractals and isFractalLow(1), title='Fractal Low', style=shape.triangleup, location=location.belowbar, color=color.new(color.lime, 0), offset=filterFractal == '3' ? -1 : -2, size=size.auto)
+
+// Inputs for Pivots
+var GRP2 = "••••••• PIVOTS •••••••"
+ShowPivots = input(title='Show Pivot points?', defval=false, group=GRP2)
+lb = input.int(5, title="Left Bars", minval = 1, inline="1", group=GRP2)
+rb = input.int(4, title="Right Bars", minval = 1, inline="1", group=GRP2)
+showHHLL = input.bool(true, title='Show HH/LL?', group=GRP2)
+hhCol = input.color(color.lime, 'HH', inline="2", group=GRP2)
+lhCol = input.color(color.red, 'LH', inline="2", group=GRP2)
+llCol = input.color(color.red, 'LL', inline="2", group=GRP2)
+hlCol = input.color(color.lime, 'HL', inline="2", group=GRP2)
+
+var pivotHighs = array.new_float(3)
+var pivotLows = array.new_float(3)
+
+ph = ta.pivothigh(lb, rb)
+ph1 = ta.valuewhen(ph, high[rb], 1)
+phSince = ta.barssince(ph)
+
+pl = ta.pivotlow(lb, rb)
+pl1 = ta.valuewhen(pl, low[rb], 1)
+
+hh = ph > ph1
+lh = ph < ph1
+ll = pl < pl1
+hl = pl > pl1
+
+_transparent = color.new(color.white, 100)
+
+plotshape(ph and ShowPivots and hh, title='HH', style=shape.triangledown, location=location.abovebar, text="HH", textcolor=showHHLL ? hhCol : _transparent, color=hhCol, offset=-rb, size=size.auto)
+plotshape(ph and ShowPivots and lh, title='LH', style=shape.triangledown, location=location.abovebar, text="LH", textcolor=showHHLL ? lhCol : _transparent, color=lhCol, offset=-rb, size=size.auto)
+
+plotshape(pl and ShowPivots and ll, title='LL', style=shape.triangleup, location=location.belowbar, text="LL", textcolor=showHHLL ? llCol : _transparent, color=llCol, offset=-rb, size=size.auto)
+plotshape(pl and ShowPivots and hl, title='HL', style=shape.triangleup, location=location.belowbar, text="HL", textcolor=showHHLL ? hlCol : _transparent, color=hlCol, offset=-rb, size=size.auto)
+
+
+var lastPH = "na"
+var lastPL = "na"
+
+if ph 
+    if hh
+        lastPH := 'HH'
+    else if lh
+        lastPH := 'LH'
+
+// label.new(bar_index, high, str.tostring(lastPH), style=label.style_none, textcolor=color.white)
