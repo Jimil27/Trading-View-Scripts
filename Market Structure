@@ -1,0 +1,861 @@
+//@version=5
+indicator('Algo Market Structure (Nephew_Sam_)', overlay=true, max_bars_back=800, max_labels_count=300, max_lines_count=300)
+
+// -----------------------------------------
+// ---------------- INPUTS -----------------
+var GRP_TF1 = "•••••••• Timeframe 1 Market Structure ••••••••"
+tf1_useStructure = input.bool(true, "", inline="1", group=GRP_TF1)
+tf1_timeframe = input.timeframe("", "Timeframe 1", inline="1", group=GRP_TF1)
+tf1_min = input.timeframe("", "Min", inline="1", group=GRP_TF1)
+
+tf1_div1 = input.bool(false, "----------------------------------", group=GRP_TF1)
+
+tf1_structureTopColor = input.color(color.new(color.green, 70), "Top", group = GRP_TF1, inline="2")
+tf1_structureBottomColor = input.color(color.new(color.green, 70), "Bottom", group = GRP_TF1, inline="2")
+tf1_structurelabelSize = input.string(title='Size', defval='auto', options=['auto', 'Tiny', 'Small'], group=GRP_TF1, inline="2")
+
+tf1_showHhll = input.bool(true, "HH/LL Labels", inline="2b", group=GRP_TF1)
+tf1_hhllBullColor = input.color(color.lime, "Bull", group = GRP_TF1, inline="2b")
+tf1_hhllBearColor = input.color(color.red, "Bear", group = GRP_TF1, inline="2b")
+tf1_hhllLabelSize = input.string(title='Size', defval='Small', options=['auto', 'Tiny', 'Small', 'Normal'], group=GRP_TF1, inline="2b")
+
+tf1_div2 = input.bool(false, "----------------------------------", group=GRP_TF1)
+
+tf1_showIlq = input.bool(true, "Show ILQ ?", inline="3", group=GRP_TF1)
+tf1_ilqText = input.string(defval='ILQ', title='Text', inline="3", group=GRP_TF1)
+tf1_ilqStyle = input.string(title="Style", defval="Solid", options=["Solid", "Dashed", "Dotted"], inline="4", group=GRP_TF1)
+tf1_ilqWidth = input.int(2, 'Width', minval=1, maxval=4, inline="4", group=GRP_TF1)
+tf1_ilqCol = input.color(color.orange, title='Col', inline='4', group=GRP_TF1)
+
+tf1_div3 = input.bool(false, "----------------------------------", group=GRP_TF1)
+
+tf1_showTlq = input.bool(true, "Show TLQ ?", inline="5", group=GRP_TF1)
+tf1_tlqText = input.string(defval='TLQ', title='Text', inline="5", group=GRP_TF1)
+tf1_showBos = input.bool(true, "Bos lines ?", inline="5", group=GRP_TF1)
+tf1_tlqStyle = input.string(title="Style", defval="Solid", options=["Solid", "Dashed", "Dotted"], inline="6", group=GRP_TF1)
+tf1_tlqWidth = input.int(1, 'Width', minval=1, maxval=4, inline="6", group=GRP_TF1)
+tf1_tlqCol = input.color(color.lime, title='Col', inline='6', group=GRP_TF1)
+
+tf1_div4 = input.bool(false, "----------------------------------", group=GRP_TF1)
+
+tf1_showEpa = input.bool(true, "Show EPA ?", inline="7", group=GRP_TF1)
+tf1_epaText = input.string(defval='EPA', title='Text', inline="7", group=GRP_TF1)
+tf1_epaDelete = input.bool(true, "Delete Unfilled", inline="7", group=GRP_TF1)
+tf1_epaStyle = input.string(title="Style", defval="Dashed", options=["Solid", "Dashed", "Dotted"], inline="8", group=GRP_TF1)
+tf1_epaWidth = input.int(1, 'Width', minval=1, maxval=4, inline="8", group=GRP_TF1)
+tf1_epaCol = input.color(color.blue, title='Col', inline='8', group=GRP_TF1)
+
+tf1_div5 = input.bool(false, "----------------------------------", group=GRP_TF1)
+
+tf1_showMsu = input.bool(true, "Show MSU Arrows ?", inline="9", group=GRP_TF1)
+
+tf1_div6 = input.bool(false, "----------------------------------", group=GRP_TF1)
+
+tf1_showExtreme = input.bool(true, "Show Extreme ?", inline="10", group=GRP_TF1)
+tf1_extremeText = input.string(defval='Extreme', title='Text', inline="10", group=GRP_TF1)
+tf1_extremeCol = input.color(color.new(color.gray, 80), title='Col', inline='10', group=GRP_TF1)
+
+tf1_div7 = input.bool(false, "----------------------------------", group=GRP_TF1)
+
+tf1_showVta = input.bool(true, "Show VTA ?", inline="11", group=GRP_TF1)
+tf1_strictVta = input.bool(false, "Strict ?", inline="11", group=GRP_TF1)
+tf1_vtaText = input.string(defval='Valid Trading Range', title='Text', inline="11", group=GRP_TF1)
+tf1_vtaTopCol = input.color(color.red, title='Top Col', inline='12', group=GRP_TF1)
+tf1_vtaBottomCol = input.color(color.green, title='Bottom Col', inline='12', group=GRP_TF1)
+tf1_deleteVta = input.bool(true, "Delete filled ?", inline="12", group=GRP_TF1)
+
+tf1_div8 = input.bool(false, "----------------------------------", group=GRP_TF1)
+
+tf1_changeBarCol = input.bool(true, "Change bar colors (read tooltip)?", inline="13", group=GRP_TF1, tooltip="Right click on your indicator, then under visual order select bring to front.\n\nSelect only 1 timeframe at a time.")
+tf1_bullishBullBarCol = input.color(color.rgb(107,194,179), title='Bullish Bull', inline='14', group=GRP_TF1)
+tf1_bullishBearBarCol = input.color(color.rgb(53,141,131), title='Bullish Bear', inline='14', group=GRP_TF1)
+tf1_bearishBullBarCol = input.color(color.rgb(247,134,143), title='Bearish Bull', inline='15', group=GRP_TF1)
+tf1_bearishBearBarCol = input.color(color.rgb(193,81,95), title='Bearish Bear', inline='15', group=GRP_TF1)
+
+
+var GRP_OTHER_STRUCTURE = "•••••••• Other Structure Settings ••••••••"
+structure_show_table = input.bool(true, "Table", inline="1", group=GRP_OTHER_STRUCTURE)
+structure_table_vertical = input.string("bottom", "↕", inline = "2", group = GRP_OTHER_STRUCTURE, options = ["top", "middle", "bottom"])
+structure_table_horizontal = input.string("right",   "↔", inline = "2", group = GRP_OTHER_STRUCTURE, options = ["left", "center", "right"])
+indicator_start_time = input.time(timestamp("02 Jan 2015 00:00 +0300"), title="Indicator Start Date", group = GRP_OTHER_STRUCTURE, tooltip="You can set a recent time if structure has been in a long range")
+// ---------------- INPUTS -----------------
+// -----------------------------------------
+
+
+// --- CONSTANTS ---
+TRANSPARENT = color.new(color.white, 100)
+
+LABEL_SPACE = "          "
+MIN = -9999999999999999999.0
+MAX =  9999999999999999999.0
+
+// Maintain array of `time` values for all bars.
+var array<int> timesArray = array.new<int>()
+array.push(timesArray, time)
+// --- CONSTANTS ---
+
+
+
+// -----------------------------------------
+// --------------- FUNCTIONS ---------------
+
+// Candles
+isNeutral(i=0) =>
+    open[i] == close[i]
+
+isBearish(i=0) =>
+    _n = isNeutral(i)
+    _temp = _n ? close[i+1] < open[i+1] : close[i] < open[i]
+    _temp
+
+isBullish(i=0) =>
+    _n = isNeutral(i)
+    _temp = _n ? close[i+1] > open[i+1] : close[i] > open[i]
+    _temp
+
+// Styles
+getLineStyle(_style) =>
+    _linestyle = _style == "Solid" ? line.style_solid : _style == "Dashed" ? line.style_dashed : line.style_dotted
+    _linestyle
+    
+getlabelSize(_labelSize) =>
+    _size = _labelSize == "auto" ? size.auto : _labelSize == "Tiny" ? size.tiny : _labelSize == "Small" ? size.small : _labelSize == "Normal" ? size.normal : size.huge
+    _size
+
+// Arrays
+addToArray(_array, _val) => array.unshift(_array, _val)
+
+removeFromArray(_array, _index) => array.remove(_array, _index)
+
+updateArrayElement(_array, _index, _val) => array.set(_array, _index, _val)
+
+getLastElementInArray(_arr) =>
+    _size = array.size(_arr)
+    _el = _size > 0 ? array.get(_arr, _size-1) : na
+    _el
+
+_get(_array, _i=0) =>
+    _temp = array.get(_array, _i)
+    _temp
+
+get5ArrayValues(_array) =>
+    _0 = array.get(_array, 0)
+    _1 = array.get(_array, 1)
+    _2 = array.get(_array, 2)
+    _3 = array.get(_array, 3)
+    _4 = array.get(_array, 4)
+
+    [_0, _1, _2, _3, _4]
+
+// Box
+_bottom(_id) => box.get_bottom(_id)
+_top(_id) => box.get_top(_id)
+_left(_id) => box.get_left(_id)
+_right(_id) => box.get_right(_id)
+
+// Fractals
+isRegularFractal(mode, n) =>
+    ret = mode == 'Buy' ? high[n - 1] < high[n] and high[n + 1] < high[n] : mode == 'Sell' ? low[n - 1] > low[n] and low[n + 1] > low[n] : false
+    ret
+
+isBWFractal(mode, n) =>
+    ret = mode == 'Buy' ? high[n - 2] < high[n] and high[n - 1] < high[n] and high[n + 1] < high[n] and high[n + 2] < high[n] : mode == 'Sell' ? low[n - 2] > low[n] and low[n - 1] > low[n] and low[n + 1] > low[n] and low[n + 2] > low[n] : false
+    ret
+
+isFractalHigh(i, _filter) =>
+    _filter == '3' ? isRegularFractal('Buy', i) : isBWFractal('Buy', i + 1)
+
+isFractalLow(i, _filter) =>
+    _filter == '3' ? isRegularFractal('Sell', i) : isBWFractal('Sell', i + 1)
+
+
+// Helpers
+delete_label(_l) =>
+    if not na(_l)
+        label.delete(_l)
+
+delete_line(_l) =>
+    if not na(_l)
+        line.delete(_l)
+
+delete_box(_l) =>
+    if not na(_l)
+        box.delete(_l)
+
+reso(exp, res) => request.security(syminfo.tickerid, res, exp, lookahead=barmerge.lookahead_on)
+
+resolutionInMinutes(tf = "") =>
+    chartTf = timeframe.multiplier * (timeframe.isseconds ? 1. / 60 : timeframe.isminutes ? 1. : timeframe.isdaily ? 60. * 24 : timeframe.isweekly ? 60. * 24 * 7 : timeframe.ismonthly ? 60. * 24 * 30.4375 : na)
+    float result = tf == "" ? chartTf : request.security(syminfo.tickerid, tf, chartTf)
+
+f_timeFrom(length, _tf = timeframe.period) =>
+    int _timeFrom = na
+    _timeFrom := int(time + resolutionInMinutes(_tf) * 60 * 1000 * length)
+    _timeFrom
+
+isHigherTimeframe(tf, eq = false) => 
+    _cond = eq ? resolutionInMinutes() >= resolutionInMinutes(tf) : resolutionInMinutes() > resolutionInMinutes(tf)
+    _cond
+
+isLowerTimeframe(tf, eq = false) =>
+    _cond = eq ? resolutionInMinutes() <= resolutionInMinutes(tf) : resolutionInMinutes() < resolutionInMinutes(tf)
+    _cond
+
+timeToBarIndex(_from) => 
+    __cond = math.round((time - _from) / (1000 * timeframe.in_seconds(timeframe.period)))
+    _cond = __cond <= 5000 ? math.abs(math.round(__cond)) : 5000
+    _cond
+
+barIndexAtTime(_arr, series int timeToFind) =>
+    int barOfTime = array.indexof(_arr, timeToFind)
+    int _result = na
+
+    if barOfTime == -1
+        _timetobars = timeToBarIndex(timeToFind)
+        _result := _timetobars
+    else
+        _result := bar_index - barOfTime
+    
+    result = _result <= 5000 ? math.abs(math.round(_result)) : 5000
+    result
+    
+
+findHtfTimeInLtf(_src, _pivotPrice, _maxBack) =>
+    int _time = na
+    int _bar_index = na
+    float _delta = 10e10
+    if not na(_pivotPrice)
+        for _i = _maxBack to 0
+            _thisDelta = _src == "high" ? math.abs(high[_i] - _pivotPrice) : math.abs(low[_i] - _pivotPrice)
+            if _thisDelta < _delta
+                _delta := _thisDelta
+                _time := time[_i]
+                _bar_index := bar_index[_i]
+    [_time, _bar_index]
+
+
+getExactTime(_time, _price, _timeframe, _direction) =>
+    _pivotTime = _time
+    if isLowerTimeframe(_timeframe)
+        _barsback = barIndexAtTime(timesArray, _time)
+        [__hTime, __hBi] = findHtfTimeInLtf(_direction, _price, _barsback)
+        _pivotTime := __hTime
+    _pivotTime
+
+findHighestBetweenTimes(_time1, _time2, _defaultH) =>
+    _highest = _defaultH
+    _highestTime = _time1
+    
+    sBi0 = barIndexAtTime(timesArray, _time1)
+    sBi1 = barIndexAtTime(timesArray, _time2)
+
+    if _time1 > _time2
+        _startFrom = isBullish(sBi1) ? sBi1 : sBi1-1
+        _endTo = isBearish(sBi0) ? sBi0 : sBi0+1
+        
+        for i = _startFrom to _endTo
+            if high[i] > _highest
+                _highest := high[i]
+                _highestTime := time[i]
+
+    [_highest, _highestTime]
+
+findLowestBetweenTimes(_time1, _time2, _defaultL) =>
+    _lowest = _defaultL
+    _lowestTime = _time1
+    
+    sBi0 = barIndexAtTime(timesArray, _time1)
+    sBi1 = barIndexAtTime(timesArray, _time2)
+
+    if _time1 > _time2
+        _startFrom = isBearish(sBi1) ? sBi1 : sBi1-1
+        _endTo = isBullish(sBi0) ? sBi0 : sBi0+1
+        
+        for i = _startFrom to _endTo
+            if low[i] < _lowest
+                _lowest := low[i]
+                _lowestTime := time[i]
+
+    [_lowest, _lowestTime]
+
+get_pivot_ohlc(i=0) =>
+    [open, high, low, close, time, open[1], high[1], low[1], close[1], time[1], open[2], high[2], low[2], close[2], time[2]]
+
+get_phpl(countSinceBullCandle, countSinceBearCandle) =>
+    _highest = countSinceBullCandle >= 0 ? ta.highest(countSinceBullCandle + 1) : -1
+    _highestBi = ta.valuewhen(high == _highest, bar_index, 0)
+    _highestTime = ta.valuewhen(high == _highest, time, 0)
+
+    _lowest = countSinceBearCandle >= 0 ? ta.lowest(countSinceBearCandle + 1) : -1
+    _lowestBi = ta.valuewhen(low == _lowest, bar_index, 0)
+    _lowestTime = ta.valuewhen(low == _lowest, time, 0)
+
+    [_highest, _highestTime, _lowest, _lowestTime]
+    
+
+getPhlData(_t, _offset) =>
+    h = reso(high[_offset], _t)
+    l = reso(low[_offset], _t)
+    _time = time(_t)
+    newbar = na(_time[1]) or _time > _time[1]
+
+    [h, l, newbar, _time]
+
+
+_TimeTo = f_timeFrom(7)
+
+
+GetPipSize() =>
+    syminfo.mintick * (syminfo.type == "forex" ? 10 : 1)
+// --------------- FUNCTIONS ---------------
+// -----------------------------------------
+
+
+
+// ------------------------------------------------------
+// --------------- TIMEFRAME1 STRUCTURE ----------------
+[tf1_open, tf1_high, tf1_low, tf1_close, tf1_time, tf1_open1, tf1_high1, tf1_low1, tf1_close1, tf1_time1, tf1_open2, tf1_high2, tf1_low2, tf1_close2, tf1_time2] = request.security(syminfo.tickerid, tf1_timeframe, get_pivot_ohlc(), lookahead=barmerge.lookahead_on)
+
+isUseTimeframe1 = not isHigherTimeframe(tf1_timeframe) and isHigherTimeframe(tf1_min, true) and tf1_useStructure and time > indicator_start_time
+
+var tf1_lastBullCandle = false
+var tf1_lastBearCandle = false
+
+if tf1_close1 > tf1_open1
+    tf1_lastBullCandle := true
+    tf1_lastBearCandle := false
+
+if tf1_close1 < tf1_open1
+    tf1_lastBullCandle := false
+    tf1_lastBearCandle := true
+
+_tf1_countBull = ta.barssince(tf1_lastBullCandle)
+tf1_countSinceBullCandle = request.security(syminfo.tickerid, tf1_timeframe, _tf1_countBull, lookahead = barmerge.lookahead_on)
+
+_tf1_countBear = ta.barssince(tf1_lastBearCandle)
+tf1_countSinceBearCandle = request.security(syminfo.tickerid, tf1_timeframe, _tf1_countBear, lookahead = barmerge.lookahead_on)
+
+tf1_newbar = ta.change(time(tf1_timeframe)) > 0
+
+// Initialize arrays
+var tf1_pivotHighs = array.new_float(5, MIN)
+var tf1_pivotHighsTime = array.new_int(5)
+var tf1_pivotLows = array.new_float(5, MAX)
+var tf1_pivotLowsTime = array.new_int(5)
+
+var label tf1_pivotHighLabel = na
+var label tf1_pivotLowLabel = na
+
+var label tf1_pivotHighHhllLabel = na
+var label tf1_pivotLowHhllLabel = na 
+
+tf1_isStructureHigh = false
+tf1_isStructureLow = false
+
+tf1_canPlot = tf1_newbar and isUseTimeframe1
+var tf1_mostRecentBullCount1 = time
+var tf1_mostRecentBearCount1 = time
+
+var tf1_initialised = false
+
+if tf1_canPlot and not tf1_initialised
+    addToArray(tf1_pivotHighsTime, tf1_time)
+    addToArray(tf1_pivotHighs, tf1_high)
+    addToArray(tf1_pivotLowsTime, tf1_time)
+    addToArray(tf1_pivotLows, tf1_low)
+    tf1_initialised := true
+
+if tf1_canPlot
+    // --- STRUCTURE HIGH ---
+    if tf1_countSinceBullCandle >= 1
+
+        __time = tf1_close1 > tf1_open1 ? tf1_time1 : tf1_time
+        [tf1_highest, tf1_highestTime] = findHighestBetweenTimes(__time, _get(tf1_pivotHighsTime), MIN)
+
+        
+        if tf1_countSinceBullCandle == 1
+            tf1_mostRecentBullCount1 := __time
+
+        if tf1_highest > _get(tf1_pivotHighs)
+            if (tf1_countSinceBullCandle == 1 and tf1_close1 != tf1_open1) or (tf1_countSinceBullCandle > 1 and tf1_highestTime >= tf1_mostRecentBullCount1 and tf1_close < tf1_open)
+                tf1_isStructureHigh := true
+
+                // Update H structure label and array
+                addToArray(tf1_pivotHighsTime, tf1_highestTime)
+                addToArray(tf1_pivotHighs, tf1_highest)
+                tf1_pivotHighLabel := label.new(tf1_highestTime, tf1_highest, xloc=xloc.bar_time, style=label.style_circle, size=getlabelSize(tf1_structurelabelSize), color=tf1_structureTopColor)
+                if tf1_showHhll
+                    tf1_pivotHighHhllLabel := label.new(tf1_highestTime, tf1_highest, xloc=xloc.bar_time, yloc=yloc.abovebar, text="HH", style=label.style_none, size=getlabelSize(tf1_hhllLabelSize), textcolor=tf1_hhllBullColor)
+
+                // Update L structure label and array
+                [tf1_lowest, tf1_lowestTime] = findLowestBetweenTimes(_get(tf1_pivotHighsTime), _get(tf1_pivotHighsTime, 1), MAX)
+                if tf1_lowestTime != _get(tf1_pivotLowsTime)
+                    addToArray(tf1_pivotLowsTime, tf1_lowestTime)
+                    addToArray(tf1_pivotLows, tf1_lowest)
+                    tf1_pivotLowLabel := label.new(tf1_lowestTime, tf1_lowest, xloc=xloc.bar_time, style=label.style_circle, size=getlabelSize(tf1_structurelabelSize), color=tf1_structureBottomColor)
+                    if tf1_showHhll
+                        tf1_pivotLowHhllLabel := label.new(tf1_lowestTime, tf1_lowest, xloc=xloc.bar_time, yloc=yloc.belowbar, text="HL", style=label.style_none, size=getlabelSize(tf1_hhllLabelSize), textcolor=tf1_hhllBullColor)
+
+            else if tf1_countSinceBullCandle > 1 and _get(tf1_pivotHighsTime) >= tf1_mostRecentBullCount1 and tf1_close < tf1_open
+                updateArrayElement(tf1_pivotHighsTime, 0, tf1_highestTime)
+                updateArrayElement(tf1_pivotHighs, 0, tf1_highest)
+                label.delete(tf1_pivotHighLabel[0])
+                tf1_pivotHighLabel := label.new(tf1_highestTime, tf1_highest, xloc=xloc.bar_time, style=label.style_circle, size=getlabelSize(tf1_structurelabelSize), color=tf1_structureTopColor)
+                if tf1_showHhll
+                    label.delete(tf1_pivotHighHhllLabel[0])
+                    tf1_pivotHighHhllLabel := label.new(tf1_highestTime, tf1_highest, xloc=xloc.bar_time, yloc=yloc.abovebar, text="HH", style=label.style_none, size=getlabelSize(tf1_hhllLabelSize), textcolor=tf1_hhllBullColor)
+
+    
+    // --- STRUCTURE LOW ---
+    if tf1_countSinceBearCandle >= 1
+        __time = tf1_close1 < tf1_open1 ? tf1_time1 : tf1_time
+        [tf1_lowest, tf1_lowestTime] = findLowestBetweenTimes(__time, _get(tf1_pivotLowsTime), MAX)
+
+        if tf1_countSinceBearCandle == 1
+            tf1_mostRecentBearCount1 := __time
+
+        if tf1_lowest < _get(tf1_pivotLows)
+            if (tf1_countSinceBearCandle == 1 and tf1_close1 != tf1_open1) or (tf1_countSinceBearCandle > 1 and tf1_lowestTime >= tf1_mostRecentBearCount1 and tf1_close > tf1_open)
+                tf1_isStructureLow := true
+                
+                // Update L structure label and array
+                addToArray(tf1_pivotLowsTime, tf1_lowestTime)
+                addToArray(tf1_pivotLows, tf1_lowest)
+                tf1_pivotLowLabel := label.new(tf1_lowestTime, tf1_lowest, xloc=xloc.bar_time, style=label.style_circle, size=getlabelSize(tf1_structurelabelSize), color=tf1_structureBottomColor)
+                if tf1_showHhll
+                    tf1_pivotLowHhllLabel := label.new(tf1_lowestTime, tf1_lowest, xloc=xloc.bar_time, yloc=yloc.belowbar, text="LL", style=label.style_none, size=getlabelSize(tf1_hhllLabelSize), textcolor=tf1_hhllBearColor)
+
+                // Update H structure label and array
+                [tf1_highest, tf1_highestTime] = findHighestBetweenTimes(_get(tf1_pivotLowsTime), _get(tf1_pivotLowsTime, 1), MIN)
+                if tf1_highestTime != _get(tf1_pivotHighsTime)
+                    addToArray(tf1_pivotHighsTime, tf1_highestTime)
+                    addToArray(tf1_pivotHighs, tf1_highest)
+                    tf1_pivotHighLabel := label.new(tf1_highestTime, tf1_highest, xloc=xloc.bar_time, style=label.style_circle, size=getlabelSize(tf1_structurelabelSize), color=tf1_structureTopColor)
+                    if tf1_showHhll
+                        tf1_pivotHighHhllLabel := label.new(tf1_highestTime, tf1_highest, xloc=xloc.bar_time, yloc=yloc.abovebar, text="LH", style=label.style_none, size=getlabelSize(tf1_hhllLabelSize), textcolor=tf1_hhllBearColor)
+
+            else if tf1_countSinceBearCandle > 1 and _get(tf1_pivotLowsTime) >= tf1_mostRecentBearCount1 and tf1_close > tf1_open
+                // Update L structure label and array
+                updateArrayElement(tf1_pivotLowsTime, 0, tf1_lowestTime)
+                updateArrayElement(tf1_pivotLows, 0, tf1_lowest)
+                label.delete(tf1_pivotLowLabel[0])
+                tf1_pivotLowLabel := label.new(tf1_lowestTime, tf1_lowest, xloc=xloc.bar_time, style=label.style_circle, size=getlabelSize(tf1_structurelabelSize), color=tf1_structureBottomColor)
+                if tf1_showHhll
+                    label.delete(tf1_pivotLowHhllLabel[0])
+                    tf1_pivotLowHhllLabel := label.new(tf1_lowestTime, tf1_lowest, xloc=xloc.bar_time, yloc=yloc.belowbar, text="LL", style=label.style_none, size=getlabelSize(tf1_hhllLabelSize), textcolor=tf1_hhllBearColor)
+
+// --------------- GET STRUCTURE DATA ---------------
+[tf1_ph0, tf1_ph1, tf1_ph2, tf1_ph3, tf1_ph4] = get5ArrayValues(tf1_pivotHighs)
+[tf1_pl0, tf1_pl1, tf1_pl2, tf1_pl3, tf1_pl4] = get5ArrayValues(tf1_pivotLows)
+
+[tf1_ph0Time, tf1_ph1Time, tf1_ph2Time, tf1_ph3Time, tf1_ph4Time] = get5ArrayValues(tf1_pivotHighsTime)
+[tf1_pl0Time, tf1_pl1Time, tf1_pl2Time, tf1_pl3Time, tf1_pl4Time] = get5ArrayValues(tf1_pivotLowsTime)
+// --------------- GET STRUCTURE DATA ---------------
+
+// --------------- TIMEFRAME1 STATS ---------------
+var tf1_isPriceEfficient = false
+var tf1_structureDirection = "bullish"
+var tf1_isMSU = false
+tf1_isBullishMsu = false
+tf1_isBearishMsu = false
+tf1_isBullishVta = false
+tf1_isBearishVta = false
+
+
+var float tf1_bottomTlqPrice = na
+var float tf1_topTlqPrice = na
+
+tf1_isValidHH = tf1_structureDirection == "bullish" ? tf1_isStructureHigh and tf1_ph0 > tf1_ph1 and tf1_ph0 > tf1_ph2 : tf1_isStructureHigh and tf1_ph0 > nz(tf1_topTlqPrice)
+tf1_isValidLL = tf1_structureDirection == "bearish" ? tf1_isStructureLow and tf1_pl0 < tf1_pl1 and tf1_pl0 < tf1_pl2 : tf1_isStructureLow and tf1_pl0 < nz(tf1_bottomTlqPrice)
+
+// label.new(bar_index, high, str.tostring(tf1_structureDirection))
+
+// --------------- TIMEFRAME1 STATS ---------------
+
+
+// --------------- TIMEFRAME1 ILQ ---------------
+var float tf1_bottomIlqPrice = na
+var float tf1_topIlqPrice = na
+
+var line tf1_bottomIlqLine = na
+var line tf1_topIlqLine = na
+
+var label tf1_bottomIlqLabel = na
+var label tf1_topIlqLabel = na
+
+if tf1_showIlq
+    if tf1_canPlot
+        if tf1_isValidHH or tf1_isValidLL
+            delete_line(tf1_bottomIlqLine)
+            delete_line(tf1_topIlqLine)
+            delete_label(tf1_bottomIlqLabel)
+            delete_label(tf1_topIlqLabel)
+
+        // Bottom ILQ
+        if tf1_isValidHH
+            tf1_bottomIlqPrice := tf1_pl0
+            tf1_topIlqPrice := na
+
+            tf1_bottomIlqLine := line.new(tf1_pl0Time, tf1_pl0, _TimeTo, tf1_pl0, xloc=xloc.bar_time, color=tf1_ilqCol, style=getLineStyle(tf1_ilqStyle), width=tf1_ilqWidth)
+            tf1_bottomIlqLabel := label.new(_TimeTo, tf1_pl0, tf1_ilqText + LABEL_SPACE, xloc=xloc.bar_time, style=label.style_none, size=getlabelSize("Normal"), textcolor=tf1_ilqCol)
+
+        // Top ILQ
+        if tf1_isValidLL
+            tf1_topIlqPrice := tf1_ph0
+            tf1_bottomIlqPrice := na
+
+            tf1_topIlqLine := line.new(tf1_ph0Time, tf1_ph0, _TimeTo, tf1_ph0, xloc=xloc.bar_time, color=tf1_ilqCol, style=getLineStyle(tf1_ilqStyle), width=tf1_ilqWidth)
+            tf1_topIlqLabel := label.new(_TimeTo, tf1_ph0, tf1_ilqText + LABEL_SPACE, xloc=xloc.bar_time, style=label.style_none, size=getlabelSize("Normal"), textcolor=tf1_ilqCol)
+
+
+    // Bottom ILQ Extend
+    if not na(tf1_bottomIlqLine)
+        line.set_x2(tf1_bottomIlqLine, _TimeTo)
+    if not na(tf1_bottomIlqLabel)
+        label.set_x(tf1_bottomIlqLabel, _TimeTo)
+
+    // Bottom ILQ Delete
+    if not na(tf1_bottomIlqLine) and tf1_low < tf1_bottomIlqPrice
+        // _tf1_ilqlinepriceL := na
+        line.delete(tf1_bottomIlqLine)
+        if not na(tf1_bottomIlqLabel)
+            label.delete(tf1_bottomIlqLabel)
+            
+    // Top ILQ Extend
+    if not na(tf1_topIlqLine)
+        line.set_x2(tf1_topIlqLine, _TimeTo)
+    if not na(tf1_topIlqLabel)
+        label.set_x(tf1_topIlqLabel, _TimeTo)
+
+    // Top ILQ Delete
+    if not na(tf1_topIlqLine) and tf1_high > tf1_topIlqPrice
+        // _tf1_ilqlinepriceL := na
+        line.delete(tf1_topIlqLine)
+        if not na(tf1_topIlqLabel)
+            label.delete(tf1_topIlqLabel)
+// --------------- TIMEFRAME1 ILQ ---------------
+
+
+
+// --------------- TIMEFRAME1 TLQ ---------------
+var line tf1_bottomTlqLine = na
+var line tf1_topTlqLine = na
+
+var label tf1_bottomTlqLabel = na
+var label tf1_topTlqLabel = na
+
+var ex_usedBosTimes = array.new_int(0)
+
+if tf1_showTlq
+    // Bottom TLQ Delete
+    if not na(tf1_bottomTlqLine) and ((low < tf1_bottomTlqPrice) or (tf1_isValidHH[1] and low[1] < tf1_bottomTlqPrice) or (low[2] < tf1_pl1 and low[2] < tf1_pl2 and low[2] < tf1_bottomTlqPrice)) and not array.includes(ex_usedBosTimes, line.get_x1(tf1_bottomTlqLine))
+        tf1_structureDirection := "bearish"
+        tf1_bottomTlqPrice := na
+        addToArray(ex_usedBosTimes, line.get_x1(tf1_bottomTlqLine))
+        
+
+        if tf1_showBos
+            line.new(line.get_x1(tf1_bottomTlqLine), line.get_y1(tf1_bottomTlqLine), time, line.get_y1(tf1_bottomTlqLine), xloc=xloc.bar_time, color=color.red)
+            label.new(time, line.get_y1(tf1_bottomTlqLine), "BOS" + LABEL_SPACE, xloc=xloc.bar_time, style=label.style_none, size=getlabelSize("Normal"), textcolor=color.red)
+
+        line.delete(tf1_bottomTlqLine)
+        if not na(tf1_bottomTlqLabel)
+            label.delete(tf1_bottomTlqLabel)
+
+    // Top TLQ Delete
+    if not na(tf1_topTlqLine) and ((high > tf1_topTlqPrice) or (tf1_isValidLL[1] and high > tf1_topTlqPrice) or (high[2] > tf1_ph1 and high[2] > tf1_ph2 and high[2] > tf1_topTlqPrice)) and not array.includes(ex_usedBosTimes, line.get_x1(tf1_bottomTlqLine))
+        tf1_structureDirection := "bullish"
+        tf1_topTlqPrice := na
+        addToArray(ex_usedBosTimes, line.get_x1(tf1_topTlqLine))
+
+        if tf1_showBos
+            line.new(line.get_x1(tf1_topTlqLine), line.get_y1(tf1_topTlqLine), time, line.get_y1(tf1_topTlqLine), xloc=xloc.bar_time, color=color.green)
+            label.new(time, line.get_y1(tf1_topTlqLine), "BOS" + LABEL_SPACE, xloc=xloc.bar_time, style=label.style_none, size=getlabelSize("Normal"), textcolor=color.green)
+
+        line.delete(tf1_topTlqLine)
+        if not na(tf1_topTlqLabel)
+            label.delete(tf1_topTlqLabel)
+
+    if close < line.get_y1(tf1_topTlqLine)
+        tf1_structureDirection := "bearish"
+
+        
+    if close > line.get_y1(tf1_bottomTlqLine)
+        tf1_structureDirection := "bullish"
+
+    if tf1_canPlot
+        if tf1_isValidHH or tf1_isValidLL
+            delete_line(tf1_bottomTlqLine)
+            delete_line(tf1_topTlqLine)
+            delete_label(tf1_bottomTlqLabel)
+            delete_label(tf1_topTlqLabel)
+
+        // Bottom TLQ
+        if tf1_isValidHH
+            tf1_bottomTlqPrice := tf1_pl1 < tf1_pl0 ? tf1_pl1 : tf1_pl0
+            tf1_bottomTlqTime = tf1_pl1 < tf1_pl0 ? tf1_pl1Time : tf1_pl0Time
+
+            tf1_topTlqPrice := na
+
+            if not array.includes(ex_usedBosTimes, tf1_bottomTlqTime)
+                tf1_bottomTlqLine := line.new(tf1_bottomTlqTime, tf1_bottomTlqPrice, _TimeTo, tf1_bottomTlqPrice, xloc=xloc.bar_time, color=tf1_tlqCol, style=getLineStyle(tf1_tlqStyle), width=tf1_tlqWidth)
+                tf1_bottomTlqLabel := label.new(_TimeTo, tf1_bottomTlqPrice, tf1_tlqText + LABEL_SPACE, xloc=xloc.bar_time, style=label.style_none, size=getlabelSize("Normal"), textcolor=tf1_tlqCol)
+
+        // Top TLQ
+        if tf1_isValidLL
+            tf1_topTlqPrice := tf1_ph1 > tf1_ph0 ? tf1_ph1 : tf1_ph0
+            tf1_topTlqTime = tf1_ph1 > tf1_ph0 ? tf1_ph1Time : tf1_ph0Time
+
+            tf1_bottomTlqPrice := na
+
+            if not array.includes(ex_usedBosTimes, tf1_topTlqTime)
+                tf1_topTlqLine := line.new(tf1_topTlqTime, tf1_topTlqPrice, _TimeTo, tf1_topTlqPrice, xloc=xloc.bar_time, color=tf1_tlqCol, style=getLineStyle(tf1_tlqStyle), width=tf1_tlqWidth)
+                tf1_topTlqLabel := label.new(_TimeTo, tf1_topTlqPrice, tf1_tlqText + LABEL_SPACE, xloc=xloc.bar_time, style=label.style_none, size=getlabelSize("Normal"), textcolor=tf1_tlqCol)
+
+
+    // Bottom TLQ Extend
+    if not na(tf1_bottomTlqLine)
+        line.set_x2(tf1_bottomTlqLine, _TimeTo)
+    if not na(tf1_bottomTlqLabel)
+        label.set_x(tf1_bottomTlqLabel, _TimeTo)
+            
+    // Top TLQ Extend
+    if not na(tf1_topTlqLine)
+        line.set_x2(tf1_topTlqLine, _TimeTo)
+    if not na(tf1_topTlqLabel)
+        label.set_x(tf1_topTlqLabel, _TimeTo)
+// --------------- TIMEFRAME1 TLQ ---------------
+
+
+// --------------- TIMEFRAME1 EXTREME ---------------
+var box tf1_bottomExtremeBox = na
+var box tf1_topExtremeBox = na
+
+if tf1_showExtreme
+    if tf1_canPlot
+        if tf1_isValidHH or tf1_isValidLL
+            delete_box(tf1_bottomExtremeBox)
+            delete_box(tf1_topExtremeBox)
+
+        // Bottom Extreme
+        if tf1_isValidHH
+            tf1_bottomExtremePrice = tf1_pl1 < tf1_pl0 ? tf1_pl1 : tf1_pl0
+            tf1_bottomExtremeTime = tf1_pl1 < tf1_pl0 ? tf1_pl1Time : tf1_pl0Time
+            _biL = barIndexAtTime(timesArray, tf1_bottomExtremeTime)
+            lowestBody = open[_biL] > close[_biL] ? close[_biL] : open[_biL]
+
+            if _biL > 1
+                tf1_bottomExtremeBox := box.new(tf1_bottomExtremeTime, lowestBody, _TimeTo, tf1_bottomExtremePrice, xloc=xloc.bar_time, border_color=TRANSPARENT, bgcolor=tf1_extremeCol, text=tf1_extremeText, text_color=color.new(tf1_extremeCol, 0), text_halign=text.align_right, text_valign=text.align_top, text_size=getlabelSize("Small"))
+                delete_box(tf1_bottomExtremeBox[1])
+        
+        // Top Extreme
+        if tf1_isValidLL
+            tf1_topExtremePrice = tf1_ph1 > tf1_ph0 ? tf1_ph1 : tf1_ph0
+            tf1_topExtremeTime = tf1_ph1 > tf1_ph0 ? tf1_ph1Time : tf1_ph0Time
+            _biH = barIndexAtTime(timesArray, tf1_topExtremeTime)
+            highestBody = open[_biH] < close[_biH] ? close[_biH] : open[_biH]
+            if _biH > 1
+                tf1_topExtremeBox := box.new(tf1_topExtremeTime, tf1_topExtremePrice, _TimeTo, highestBody, xloc=xloc.bar_time, border_color=TRANSPARENT, bgcolor=tf1_extremeCol, text=tf1_extremeText, text_color=color.new(tf1_extremeCol, 0), text_halign=text.align_right, text_valign=text.align_bottom, text_size=getlabelSize("Small"))
+                delete_box(tf1_topExtremeBox[1])
+
+    // Bottom Extreme Extend
+    if not na(tf1_bottomExtremeBox)
+        box.set_right(tf1_bottomExtremeBox, _TimeTo)
+
+    // Bottom Extreme Delete
+    if not na(tf1_bottomExtremeBox) and low < _bottom(tf1_bottomExtremeBox)
+        delete_box(tf1_bottomExtremeBox)
+            
+    // Top Extreme Extend
+    if not na(tf1_topExtremeBox)
+        box.set_right(tf1_topExtremeBox, _TimeTo)
+
+    // Top Extreme Delete
+    if not na(tf1_topExtremeBox) and high > _top(tf1_topExtremeBox)
+        delete_box(tf1_topExtremeBox)
+// --------------- TIMEFRAME1 EXTREME ---------------
+
+
+// --------------- TIMEFRAME1 EPA ---------------
+var float tf1_bearEpaPrice = na
+var float tf1_bullEpaPrice = na
+
+var line tf1_bearEpaLine = na
+var line tf1_bullEpaLine = na
+
+var label tf1_bearEpaLabel = na
+var label tf1_bullEpaLabel = na
+
+if tf1_showEpa
+    if tf1_canPlot 
+        if tf1_isValidHH or tf1_isValidLL
+            tf1_isPriceEfficient := false
+            if tf1_epaDelete
+                delete_line(tf1_bearEpaLine)
+                delete_line(tf1_bullEpaLine)
+                delete_label(tf1_bearEpaLabel)
+                delete_label(tf1_bullEpaLabel)
+
+        // Bear EPA
+        if tf1_isValidLL
+            tf1_bearEpaPrice := tf1_pl1
+            tf1_bullEpaPrice := na
+
+            tf1_bearEpaLine := line.new(tf1_pl1Time, tf1_pl1, _TimeTo, tf1_pl1, xloc=xloc.bar_time, color=tf1_epaCol, style=getLineStyle(tf1_epaStyle), width=tf1_epaWidth)
+            tf1_bearEpaLabel := label.new(_TimeTo, tf1_pl1, tf1_epaText + LABEL_SPACE, xloc=xloc.bar_time, style=label.style_none, size=getlabelSize("Normal"), textcolor=tf1_epaCol)
+
+        // Bull EPA
+        if tf1_isValidHH
+            tf1_bullEpaPrice := tf1_ph1
+            tf1_bearEpaPrice := na
+
+            tf1_bullEpaLine := line.new(tf1_ph1Time, tf1_ph1, _TimeTo, tf1_ph1, xloc=xloc.bar_time, color=tf1_epaCol, style=getLineStyle(tf1_epaStyle), width=tf1_epaWidth)
+            tf1_bullEpaLabel := label.new(_TimeTo, tf1_ph1, tf1_epaText + LABEL_SPACE, xloc=xloc.bar_time, style=label.style_none, size=getlabelSize("Normal"), textcolor=tf1_epaCol)
+
+
+    // Bear EPA Extend
+    if not na(tf1_bearEpaLine)
+        line.set_x2(tf1_bearEpaLine, _TimeTo)
+    if not na(tf1_bearEpaLabel)
+        label.set_x(tf1_bearEpaLabel, _TimeTo)
+
+    // Bear EPA Delete
+    if not na(tf1_bearEpaLine) and high > tf1_bearEpaPrice
+        tf1_isPriceEfficient := true
+        line.delete(tf1_bearEpaLine)
+        if not na(tf1_bearEpaLabel)
+            label.delete(tf1_bearEpaLabel)
+            
+    // Bull EPA Extend
+    if not na(tf1_bullEpaLine)
+        line.set_x2(tf1_bullEpaLine, _TimeTo)
+    if not na(tf1_bullEpaLabel)
+        label.set_x(tf1_bullEpaLabel, _TimeTo)
+
+    // Bull EPA Delete
+    if not na(tf1_bullEpaLine) and low < tf1_bullEpaPrice
+        tf1_isPriceEfficient := true
+        line.delete(tf1_bullEpaLine)
+        if not na(tf1_bullEpaLabel)
+            label.delete(tf1_bullEpaLabel)
+// --------------- TIMEFRAME1 EPA ---------------
+
+
+// --------------- TIMEFRAME1 MSU ---------------
+tf1_isBearishMsu := (tf1_ph0 < tf1_ph1) and (tf1_pl0 < tf1_pl1) and (high > tf1_ph0 and high < tf1_ph1)
+tf1_isBullishMsu := (tf1_pl0 > tf1_pl1) and (tf1_ph0 > tf1_ph1) and (low < tf1_pl0 and low > tf1_pl1)
+
+plotshape(tf1_showMsu and tf1_isBearishMsu, color=color.red, style=shape.arrowdown, location=location.bottom, size=size.tiny, editable=false)
+plotshape(tf1_showMsu and tf1_isBullishMsu, color=color.lime, style=shape.arrowup, location=location.bottom, size=size.tiny, editable=false)
+// --------------- TIMEFRAME1 MSU ---------------
+
+
+// --------------- TIMEFRAME1 VTR ---------------
+var box tf1_bottomVtaBox = na
+var box tf1_topVtaBox = na
+
+var box[] tf1_bottomVtaBoxes = array.new_box(0)
+var box[] tf1_topVtaBoxes = array.new_box(0)
+
+tf1_isStrictBottomVta = (tf1_pl1 < tf1_pl2) and (tf1_pl0 < tf1_pl1) and (tf1_ph0 > tf1_ph1) and (close > tf1_ph0) // LL-HH-LL-HH
+tf1_isStrictTopVta = (tf1_ph1 > tf1_ph2) and (tf1_ph0 > tf1_ph1) and (tf1_pl0 < tf1_pl1) and (close < tf1_pl0) // HH-LL-HH-LL
+
+tf1_isBottomVta = tf1_strictVta ? tf1_isStrictBottomVta : (tf1_ph0 > tf1_ph1) and (tf1_pl0 < tf1_pl1) and (close > tf1_ph0) // HH-LL-HH
+tf1_isTopVta =  tf1_strictVta ? tf1_isStrictTopVta : (tf1_pl0 < tf1_pl1) and (tf1_ph0 > tf1_ph1) and (close < tf1_pl0) // LL-HH-LL
+
+var ex_usedVtaTimes = array.new_int(0)
+
+// Plot VTA
+if tf1_showVta
+
+    if tf1_isTopVta and not array.includes(ex_usedVtaTimes, tf1_pl0Time) and tf1_ph0Time >= tf1_pl0Time
+        addToArray(ex_usedVtaTimes, tf1_pl0Time)
+        addToArray(tf1_topVtaBoxes, box.new(tf1_pl0Time, tf1_ph0, _TimeTo, tf1_pl0, xloc=xloc.bar_time, border_color=tf1_vtaTopCol, bgcolor=TRANSPARENT, text=tf1_vtaText, text_color=tf1_vtaTopCol, text_halign=text.align_right, text_valign=text.align_top, text_size=getlabelSize("Small")))
+            
+    if tf1_isBottomVta and not array.includes(ex_usedVtaTimes, tf1_ph0Time) and tf1_pl0Time >= tf1_ph0Time
+        addToArray(ex_usedVtaTimes, tf1_ph0Time)
+        addToArray(tf1_bottomVtaBoxes, box.new(tf1_ph0Time, tf1_ph0, _TimeTo, tf1_pl0, xloc=xloc.bar_time, border_color=tf1_vtaBottomCol, bgcolor=TRANSPARENT, text=tf1_vtaText, text_color=tf1_vtaBottomCol, text_halign=text.align_right, text_valign=text.align_bottom, text_size=getlabelSize("Small")))
+        
+
+    // Delete boxes
+    if tf1_deleteVta == true
+        // Top
+        if array.size(tf1_topVtaBoxes) > 0
+            for i = array.size(tf1_topVtaBoxes)-1 to 0
+                _box = array.get(tf1_topVtaBoxes, i)
+                
+                if not na(_box) and high > _bottom(_box) and close < _top(_box)
+                    tf1_isBearishVta := true
+
+                // Delete top
+                if (not na(_box) and tf1_close > _top(_box))
+                    removeFromArray(tf1_topVtaBoxes, i)
+                    box.delete(_box)
+        // Bottom
+        if array.size(tf1_bottomVtaBoxes) > 0
+            for i = array.size(tf1_bottomVtaBoxes)-1 to 0
+                _box = array.get(tf1_bottomVtaBoxes, i)
+
+                if not na(_box) and low < _top(_box) and close > _bottom(_box)
+                    tf1_isBullishVta := true
+
+                // Delete bottom
+                if (not na(_box) and tf1_close < _bottom(_box))
+                    removeFromArray(tf1_bottomVtaBoxes, i)
+                    box.delete(_box)
+// --------------- TIMEFRAME1 VTR ---------------
+
+
+// --------------- TIMEFRAME1 BAR COLOR ---------------
+tf1_barcolor = not isUseTimeframe1 ? na : tf1_structureDirection == "bullish" and close > open ? tf1_bullishBullBarCol
+     : tf1_structureDirection == "bullish" and close < open ? tf1_bullishBearBarCol
+     : tf1_structureDirection == "bearish" and close > open ? tf1_bearishBullBarCol
+     : tf1_structureDirection == "bearish" and close < open ? tf1_bearishBearBarCol
+     : na
+
+plotcandle(tf1_changeBarCol ? open : na, high, low, close, title='Title', color =tf1_barcolor, wickcolor=tf1_barcolor, bordercolor=tf1_barcolor)
+
+// --------------- TIMEFRAME1 BAR COLOR ---------------
+
+
+// --------------- PATTERN ---------------
+tf1_isBullishPattern = false
+tf1_isBearishPattern = false
+
+//                      HH                       HH                      LH                     LL                      LL
+tf1_isBearishPattern := (tf1_ph2 > tf1_ph3) and (tf1_ph1 > tf1_ph2) and (tf1_ph0 < tf1_ph1) and (tf1_pl1 < tf1_pl2) and (tf1_pl0 < tf1_pl1) and (close > tf1_pl0)
+tf1_isBullishPattern := (tf1_pl2 < tf1_pl3) and (tf1_pl1 < tf1_pl2) and (tf1_pl0 > tf1_pl1) and (tf1_ph1 > tf1_ph2) and (tf1_ph0 > tf1_ph1) and (close < tf1_ph0)
+
+plotshape(tf1_div8 and tf1_isBearishPattern and tf1_structureDirection == "bearish", color=color.red, style=shape.xcross, location=location.bottom, size=size.tiny, editable=false)
+plotshape(tf1_div8 and tf1_isBullishPattern and tf1_structureDirection == "bullish", color=color.lime, style=shape.xcross, location=location.bottom, size=size.tiny, editable=false)
+
+
+// if barstate.islast
+//     label.new(bar_index, high, str.tostring(tf1_ph2) + "\n" + )
+// --------------- PATTERN ---------------
+
+// --------------- TIMEFRAME1 STRUCTURE ----------------
+// ------------------------------------------------------
+
+
+
+// ----------------------------------------------
+// --------------- DETAILS TABLE ----------------
+if barstate.islast and structure_show_table
+    table _table = table.new(structure_table_vertical + "_" + structure_table_horizontal, columns = 6, rows = 5, border_width=3)
+        
+    table.cell(_table, column = 0, row = 0, text = "")
+    table.cell(_table, column = 0, row = 1, text = "Structure", text_color=color.white, bgcolor=color.new(color.black, 80))
+    table.cell(_table, column = 0, row = 2, text = "Effeciency", text_color=color.white, bgcolor=color.new(color.black, 80))
+    table.cell(_table, column = 0, row = 3, text = "MSU", text_color=color.white, bgcolor=color.new(color.black, 80))
+    table.cell(_table, column = 0, row = 4, text = "VTA", text_color=color.white, bgcolor=color.new(color.black, 80))
+
+    if isUseTimeframe1
+        _timeframeString = tf1_timeframe == "" ? timeframe.period : tf1_timeframe
+        table.cell(_table, column = 1, row = 0, text = str.tostring(_timeframeString), text_color=color.green, bgcolor=color.new(color.green, 90))
+        table.cell(_table, column = 1, row = 1, text = isUseTimeframe1 ? tf1_structureDirection == "bullish" ? "Bullish ▲" : "Bearish ▼" : "NA", text_color=tf1_structureDirection == "bullish" ? color.lime : color.red)
+        table.cell(_table, column = 1, row = 2, text = isUseTimeframe1 ? tf1_isPriceEfficient ? "Efficient ✓" : "Inefficient 𐄂" : "NA", text_color=tf1_isPriceEfficient ? color.lime : color.red)
+        table.cell(_table, column = 1, row = 3, text = isUseTimeframe1 ? tf1_isBullishMsu ? "MSU ▲" : tf1_isBearishMsu ? "MSU ▼" : "" : "NA", text_color=tf1_isBullishMsu ? color.lime : color.red)
+        table.cell(_table, column = 1, row = 4, text = isUseTimeframe1 ? tf1_isBullishVta ? "VTA ▲" : tf1_isBearishVta ? "VTA ▼" : "" : "NA", text_color=tf1_isBullishVta ? color.lime : color.red)
+// --------------- DETAILS TABLE ----------------
+// ----------------------------------------------
